@@ -18,6 +18,9 @@ querying.
 """
 
 import os
+import re
+
+from lib2to3.pgen2 import tokenize
 
 from yapf.yapflib import py3compat
 
@@ -39,8 +42,6 @@ def WriteReformattedCode(filename, reformatted_code, in_place, encoding):
     in_place: (bool) If True, then write the reformatted code to the file.
     encoding: (unicode) The encoding of the file.
   """
-  if not reformatted_code.strip():
-    return
   if in_place:
     with py3compat.open_with_encoding(filename, mode='w',
                                       encoding=encoding) as fd:
@@ -72,4 +73,20 @@ def _FindPythonFiles(filenames, recursive):
 
 def IsPythonFile(filename):
   """Return True if filename is a Python file."""
-  return os.path.splitext(filename)[1] == '.py'
+  if os.path.splitext(filename)[1] == '.py':
+    return True
+
+  try:
+    with open(filename, 'rb') as fd:
+      encoding = tokenize.detect_encoding(fd.readline)[0]
+  except IOError:
+    return False
+
+  try:
+    with py3compat.open_with_encoding(filename, mode='r',
+                                      encoding=encoding) as fd:
+      first_line = fd.readlines()[0]
+  except (IOError, IndexError):
+    return False
+
+  return re.match(r'^#!.*\bpython[23]?\b', first_line)
